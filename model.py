@@ -1,12 +1,18 @@
 import pickle
+import gzip
+
+# 圧縮されたモデルを読み込む関数
+def load_compressed_model(file_path):
+    with gzip.open(file_path, 'rb') as f:
+        return pickle.load(f)
 
 # 保存したモデルを読み込む
-model_outcome_e = pickle.load(open('outcome_e_rf_model.pkl', 'rb'))
-model_hospitalstay_e = pickle.load(open('hospitalstay_e_rf_model.pkl', 'rb'))
-model_nursingcare_apply_e = pickle.load(open('nursingcare_apply_e_rf_model.pkl', 'rb'))
-model_outcome_p = pickle.load(open('outcome_p_rf_model.pkl', 'rb'))
-model_hospitalstay_p = pickle.load(open('hospitalstay_p_rf_model.pkl', 'rb'))
-model_nursingcare_apply_p = pickle.load(open('nursingcare_apply_p_rf_model.pkl', 'rb'))
+model_outcome_e = load_compressed_model('outcome_e_rf_model.pkl.gz')
+model_hospitalstay_e = load_compressed_model('hospitalstay_e_rf_model.pkl.gz')
+model_nursingcare_apply_e = load_compressed_model('nursingcare_apply_e_rf_model.pkl.gz')
+model_outcome_p = load_compressed_model('outcome_p_rf_model.pkl.gz')
+model_hospitalstay_p = load_compressed_model('hospitalstay_p_rf_model.pkl.gz')
+model_nursingcare_apply_p = load_compressed_model('nursingcare_apply_p_rf_model.pkl.gz')
 
 # モデルを辞書にまとめる
 models = {
@@ -17,4 +23,3 @@ models = {
     'hospitalstay_p': model_hospitalstay_p,
     'nursingcare_p': model_nursingcare_apply_p  
 }
-
