@@ -1,84 +1,41 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import japanize_matplotlib
-from fastapi import FastAPI
-from pydantic import BaseModel
 import pickle
-import ipywidgets as widgets
-from IPython.display import display
 from model import models  # model.pyからモデルをインポート
 
-# インスタンス化
-app = FastAPI()
-
-# 入力データの型を定義
-class InputData(BaseModel):
-    男_1: int
-    年齢群: int
-    食事: int
-    移乗: int
-    整容: int
-    トイレ動作: int
-    入浴: int
-    平地歩行: int
-    階段: int
-    更衣: int
-    排便管理: int
-    排尿管理: int
-    認知症自立度: int
-    介護_取得済: int
-    介護_未取得: int
-    介護_対象外: int
-    予定外_1: int
-    診療科_救命科: int
-    診療科_消化器内科: int
-    診療科_循環器内科: int
-    診療科_呼吸器内科: int
-    診療科_脳神経内科: int
-    診療科_血液内科: int
-    診療科_その他: int
-
-# トップページ
-@app.get('/')
-async def index():
-    return {"message": "日常生活動作で入院日数や転帰を予測するアプリです"}
-
-# POSTが送信された時（入力）と予測値（出力）の定義
-@app.post('/make_predictions')
-async def make_predictions(data: InputData):
-    input_data = np.array([[data.男_1, data.年齢群, data.食事, data.移乗, data.整容, data.トイレ動作, data.入浴, data.平地歩行, data.階段, data.更衣, data.排便管理, data.排尿管理, data.認知症自立度,
-                            data.介護_取得済, data.介護_未取得, data.介護_対象外, data.予定外_1, data.診療科_救命科, data.診療科_消化器内科, data.診療科_循環器内科, data.診療科_呼吸器内科, data.診療科_脳神経内科, data.診療科_血液内科, data.診療科_その他]])
+def make_predictions(input_array):
 
     # 予定外_1 の値に応じて使用するモデルを切り替える
-    if data.予定外_1 == 0:
-        prediction_outcome = models['outcome_p'].predict(input_data)
-        probabilities_outcome = models['outcome_p'].predict_proba(input_data)
-        prediction_hospitalstay = models['hospitalstay_p'].predict(input_data)
-        probabilities_hospitalstay = models['hospitalstay_p'].predict_proba(input_data)
+    if input_array[0][16] == 0:  # 予定外_1
+        prediction_outcome = models['outcome_p'].predict(input_array)
+        probabilities_outcome = models['outcome_p'].predict_proba(input_array)
+        prediction_hospitalstay = models['hospitalstay_p'].predict(input_array)
+        probabilities_hospitalstay = models['hospitalstay_p'].predict_proba(input_array)
     else:
-        prediction_outcome = models['outcome_e'].predict(input_data)
-        probabilities_outcome = models['outcome_e'].predict_proba(input_data)
-        prediction_hospitalstay = models['hospitalstay_e'].predict(input_data)
-        probabilities_hospitalstay = models['hospitalstay_e'].predict_proba(input_data)
-
-    input_data_2 = np.array([[data.男_1, data.年齢群, data.食事, data.移乗, data.整容, data.トイレ動作, data.入浴, data.平地歩行, data.階段, data.更衣, data.排便管理, data.排尿管理, data.認知症自立度,
-                            data.予定外_1, data.診療科_救命科, data.診療科_消化器内科, data.診療科_循環器内科, data.診療科_呼吸器内科, data.診療科_脳神経内科, data.診療科_血液内科, data.診療科_その他]])
-
-    # 予定外_1 の値に応じて使用するモデルを切り替える
-    if data.予定外_1 == 0:
-        prediction_nursingcare = models['nursingcare_p'].predict(input_data_2)
-        probabilities_nursingcare = models['nursingcare_p'].predict_proba(input_data_2)
+        if input_array[0][17] == 1:  # 診療科_救命科
+            model_key = 'e_e'
+        elif input_array[0][18] == 1:  # 診療科_消化器内科
+            model_key = 'e_g'
+        else:
+            model_key = 'e_o'
+        prediction_outcome = models[f'outcome_{model_key}'].predict(input_array)
+        probabilities_outcome = models[f'outcome_{model_key}'].predict_proba(input_array)
+        prediction_hospitalstay = models[f'hospitalstay_{model_key}'].predict(input_array)
+        probabilities_hospitalstay = models[f'hospitalstay_{model_key}'].predict_proba(input_array)
+    
+    # 介護申請の必要性予測
+    input_array_2 = input_data = np.delete(input_array, [13, 14, 15], axis=1)
+    if input_array[0][16] == 0:  # 予定外_1
+        prediction_nursingcare = models['nursingcare_p'].predict(input_array_2)
+        probabilities_nursingcare = models['nursingcare_p'].predict_proba(input_array_2)
     else:
-        prediction_nursingcare = models['nursingcare_e'].predict(input_data_2)
-        probabilities_nursingcare = models['nursingcare_e'].predict_proba(input_data_2)
+        prediction_nursingcare = models['nursingcare_e'].predict(input_array_2)
+        probabilities_nursingcare = models['nursingcare_e'].predict_proba(input_array_2)
 
     return {
         "予想される退院経路": {
             "死亡の確率": f"{probabilities_outcome[0][0] * 100:.1f}%",
             "転院の確率": f"{probabilities_outcome[0][1] * 100:.1f}%"
-#            "通常退院の確率": f"{probabilities_outcome[0][2] * 100:.1f}%"
         },
         "予想される入院期間": {
             "1週間以内の確率": f"{probabilities_hospitalstay[0][0] * 100:.1f}%",
@@ -87,17 +44,20 @@ async def make_predictions(data: InputData):
             "3週間以上の確率": f"{probabilities_hospitalstay[0][3] * 100:.1f}%"
         },
         "介護申請の必要性(判定1)": {
-            "判定": "必要です" if (probabilities_outcome[0][1] * 100 >= 10 or (probabilities_hospitalstay[0][2] * 100 + probabilities_hospitalstay[0][3] * 100) >= 20) and (data.介護_未取得 == 1) else "まだしなくて良い" if data.介護_未取得 == 1 else "取得済みです(地域包括支援センターに有事相談できます)"
+            "判定": (
+                "必要です" if (probabilities_outcome[0][1] * 100 >= 20 or probabilities_hospitalstay[0][3] * 100 >= 20) and input_array[0][14] == 1 and input_array[0][1] >= 4
+                else "申請中です(地域包括支援センターに有事相談できます)" if input_array[0][14] == 1 and input_array[0][13] == 0 and input_array[0][15] == 0
+                else "まだしなくて良い" if input_array[0][14] == 1
+                else "取得済みです(地域包括支援センターに有事相談できます)"
+            )
         },
         "介護申請の必要性(判定2)": {
-#            "介護申請は不要な確率": f"{probabilities_nursingcare[0][0] * 100:.1f}%",
             "介護申請が必要な確率": f"{probabilities_nursingcare[0][1] * 100:.1f}%",
-#            "判定": "必要です" if (prediction_nursingcare[0] == 1) else "まだしなくて良い" if data.介護_未取得 == 1 else "取得済みです(地域包括支援センターに有事相談できます)",
-            "判定": "必要です" if probabilities_nursingcare[0][1] >= 30 else "まだしなくて良い" if data.介護_未取得 == 1 else "取得済みです(地域包括支援センターに有事相談できます)"
+            "判定": (
+                "必要です" if probabilities_nursingcare[0][1] * 100 >= 30 and input_array[0][1] >= 4 and input_array[0][14] == 1
+                else "申請中です(地域包括支援センターに有事相談できます)" if input_array[0][14] == 1 and input_array[0][13] == 0 and input_array[0][15] == 0
+                else "まだしなくて良い" if input_array[0][14] == 1
+                else "取得済みです(地域包括支援センターに有事相談できます)"
+            )
         }
     }
-
-# FastAPIを起動する
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
