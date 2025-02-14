@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: app1
+    env: python
+    plan: free
+    repo: https://github.com/ME1109/iADL_internalmed_outcomes_Musashino
+    branch: master
+    buildCommand: ""
+    startCommand: "streamlit run app1.py --server.port $PORT --server.address 0.0.0.0"
+    envVars:
+      - key: PORT
+        value: 8501
